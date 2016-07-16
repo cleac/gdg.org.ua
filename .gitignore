@@ -48,5 +48,8 @@ log/*.log.*
 bower_components
 .exports
 
-#vagga configs
+# vagga files
 .vagga/
+
+# vagrant files
+.vagrant/
