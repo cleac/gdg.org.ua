@@ -3,6 +3,7 @@ project_metadata:
 
 global:
   environment: test_suite
+  bypass_auth: true
   engine.url_for.on: true
   engine.sqlalchemy.on: true
   engine.oauth.on: true
@@ -109,8 +110,8 @@ controllers:
     controller: !!python/name:GDGUkraine.rest_controller.rest_api
     /:
       request.dispatch: !!python/name:GDGUkraine.rest_controller.rest_api
-      request.error_response: !!python/name:GDGUkraine.rest_controller.unexpected_error_handler
-      error_page.default: !!python/name:GDGUkraine.rest_controller.generic_error_handler
+      request.error_response: !!python/name:GDGUkraine.errors.unexpected_json_error_handler
+      error_page.default: !!python/name:GDGUkraine.errors.generic_json_error_handler
       tools.orm_session.on: true
       tools.sessions.on: true
   /events:
@@ -133,6 +134,7 @@ jinja2:
   auto_reload: true
   use_webassets: false
   globals:
+    is_admin: !!python/name:GDGUkraine.lib.utils.auth.is_admin
     url_for: !!python/name:GDGUkraine.lib.utils.url.url_for
     url_for_class: !!python/name:GDGUkraine.lib.utils.url.url_for_class
     url_for_routes: !!python/name:GDGUkraine.lib.utils.url.url_for_routes

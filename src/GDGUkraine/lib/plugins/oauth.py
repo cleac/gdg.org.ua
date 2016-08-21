@@ -42,8 +42,8 @@ class OAuthEnginePlugin(SimplePlugin):
     # https://github.com/google/oauth2client/blob/master/
     # oauth2client/client.py#L1874
     code_redirect_uri = 'postmessage'  # Do not touch! Magic!
-    authorization_base_url = "https://accounts.google.com/o/oauth2/auth"
-    token_url = "https://accounts.google.com/o/oauth2/token"
+    authorization_base_url = 'https://accounts.google.com/o/oauth2/auth'
+    token_url = 'https://accounts.google.com/o/oauth2/token'
     refresh_url = token_url  # True for Google but not all providers.
 
     _channels = {
@@ -154,7 +154,7 @@ class OAuthEnginePlugin(SimplePlugin):
             self.authorization_base_url,
             # offline for refresh token
             # force to always make user click authorize
-            access_type="offline", approval_prompt="force")
+            access_type='offline', approval_prompt='force')
         return authorization_url
 
     def _get_state_session(self):
@@ -187,7 +187,7 @@ class OAuthEnginePlugin(SimplePlugin):
 
     def fetch_token(self):
         req = cherrypy.request
-        redirect_response = '{}?{}'.format(cherrypy.url(),
+        redirect_response = '{}?{}'.format(self.redirect_url,
                                            req.query_string)
         self.token = self._get_state_session().fetch_token(
             self.token_url, client_secret=self.consumer_secret,

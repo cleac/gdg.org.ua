@@ -1,22 +1,21 @@
-import json
 import logging
 import re
-import sys
-import traceback
 
+from copy import deepcopy
 from datetime import date
 from uuid import uuid4
 
 import cherrypy
 
 from cherrypy import HTTPError
-from cherrypy.lib import httputil as cphttputil, file_generator
+from cherrypy.lib import file_generator
 
 from blueberrypy.util import from_collection, to_collection
 
 from requests.exceptions import HTTPError as RequestsHTTPError
 
 from . import api
+from .errors import InvalidFormDataError
 from .model import User, Event, EventParticipant, Invite
 
 from .lib.utils.gdrive import gdrive_upload
@@ -24,13 +23,17 @@ from .lib.utils.mail import gmail_send_html
 from .lib.utils.table_exporter import gen_participants_xlsx
 from .lib.utils.signals import pub
 from .lib.utils.vcard import make_vcard, aes_encrypt
+from .lib.forms import (
+    RegistrationForm, get_additional_fields_form_cls,
+    InputDict,
+)
 
 
 logger = logging.getLogger(__name__)
 
 
 class APIBase:
-    _cp_config = {"tools.json_in.on": True}
+    _cp_config = {'tools.json_in.on': True}
 
     def create(self, **kwargs):
         raise NotImplementedError()
@@ -109,50 +112,73 @@ class Participants(APIBase):
     def create(self, **kwargs):
         req = cherrypy.request
         orm_session = req.orm_session
-        u = req.json['user']
-        logger.debug(req.json)
-        logger.debug(u)
+
+        try:
+            event_id = int(req.json['event'])
+        except (ValueError, TypeError, KeyError):
+            raise HTTPError(400, 'Invalid `event` param')
+
+        event = api.find_event_by_id(orm_session, event_id)
+        if not event:
+            raise HTTPError(404, 'Event not found')
+
+        # Get request data
+        u = req.json.get('user', {})
+        fields = req.json.get('fields')
+
+        # Validate form data
+        regform = RegistrationForm(hidden=None, formdata=InputDict(u))
+        fieldsform_cls = get_additional_fields_form_cls(event.fields)
+        fieldsform = fieldsform_cls(InputDict(fields))
+        if not all([regform.validate(), fieldsform.validate()]):
+            errors = deepcopy(regform.errors)
+            errors.update(fieldsform.errors)
+            raise InvalidFormDataError(errors)
+
+        # Registration BL
         user = User(**u)
+
+        invitation = None
+        if req.json.get('invite_code'):
+            invitation = api.find_invitation_by_code(
+                orm_session, req.json['invite_code']
+            )
+
+            # check if the invitation is valid
+            if (
+                invitation is None or invitation.used or
+                (invitation.event and invitation.event.id != event.id) or
+                (invitation.email is not None and invitation.email != user.email)
+            ):
+                raise HTTPError(403, 'Invalid invite code.')
+
         eu = api.find_user_by_email(orm_session, user.email)
         if eu:
             user.id = eu.id
             orm_session.merge(user)
         else:
             orm_session.add(user)
+        orm_session.flush()
+
+        eep = api.get_event_registration(orm_session, user.id, event.id)
+        ep = EventParticipant(
+            id=eep.id if eep else None,
+            event_id=event.id,
+            googler_id=user.id,
+            register_date=date.today(),
+            fields=fields,
+        )
+
+        if eep:
+            orm_session.merge(ep)
+        else:
+            orm_session.add(ep)
+        if invitation is not None:
+            invitation.email = user.email
+            invitation.used = True
+            orm_session.merge(invitation)
         orm_session.commit()
-        if req.json.get('event'):
-            eid = int(req.json['event'])
-            # check if the invitation is valid
-            i = None
-            if req.json.get('invite_code'):
-                i = api.find_invitation_by_code(orm_session,
-                                                req.json['invite_code'])
-                if i is None or i.used or \
-                        (i.event is not None and
-                            i.event != api.find_event_by_id(
-                                orm_session,
-                                req.json['event'])) or \
-                        (i.email is not None and i.email != user.email):
-                    raise HTTPError(403, "Invalid invite code.")
-            logger.debug(type(req.json.get('fields')))
-            logger.debug(req.json.get('fields'))
-            eep = api.get_event_registration(orm_session, user.id, eid)
-            ep = EventParticipant(
-                id=eep.id if eep else None, event_id=eid, googler_id=user.id,
-                register_date=date.today(),
-                fields=req.json['fields'] if req.json.get('fields') else None)
-            logger.debug(ep.fields)
-            if eep:
-                orm_session.merge(ep)
-            else:
-                orm_session.add(ep)
-            if i is not None:
-                i.email = user.email
-                i.used = True
-                orm_session.merge(i)
-            orm_session.commit()
-            logger.debug(ep.fields)
-            logger.debug(type(ep.fields))
+
         return to_collection(user, sort_keys=True)
 
     @cherrypy.tools.json_out()
@@ -164,7 +190,7 @@ class Participants(APIBase):
             events = api.find_events_by_user(cherrypy.request.orm_session,
                                              user)
             logger.debug(events)
-            u = to_collection(user, excludes=("password", "salt"),
+            u = to_collection(user, excludes=('password', 'salt'),
                               sort_keys=True)
             u.update({'events': [
                 to_collection(e, sort_keys=True) for e in events]})
@@ -179,7 +205,7 @@ class Participants(APIBase):
         users = api.get_all_users(cherrypy.request.orm_session)
         if users:
             return [to_collection(
-                u, excludes=("password", "salt"), sort_keys=True)
+                u, excludes=('password', 'salt'), sort_keys=True)
                 for u in users]
         raise HTTPError(404)
 
@@ -194,7 +220,7 @@ class Participants(APIBase):
             user = from_collection(req.json, user)
             orm_session.merge(user)
             orm_session.commit()
-            return to_collection(user, excludes=("password", "salt"),
+            return to_collection(user, excludes=('password', 'salt'),
                                  sort_keys=True)
         raise HTTPError(404)
 
@@ -236,10 +262,11 @@ class Events(APIBase):
             e.update({'registrations': [to_collection(r, sort_keys=True)
                      for r in registrations]})
             for r in e['registrations']:
+                r.update({'cardUrl': aes_encrypt(str(r['id']))})
                 r.update({'participant': to_collection(
                     api.find_user_by_id(cherrypy.request.orm_session,
                                         r['googler_id']),
-                    excludes=("password", "salt"))})
+                    excludes=('password', 'salt'))})
             logger.debug(e)
             return e
         raise HTTPError(404)
@@ -491,7 +518,7 @@ class Events(APIBase):
             # Type- or KeyError if data is None or has no 'number'
             # AssertionError if number of invites is negative
             logger.exception()
-            raise HTTPError(400, "Malformed request body") from e
+            raise HTTPError(400, 'Malformed request body') from e
 
         event = api.find_event_by_id(orm_session, id)
         if event is None:
@@ -508,8 +535,25 @@ class Events(APIBase):
             # saving invites to db. We need to rollback.
             orm_session.rollback()
             logger.exception()
-            raise HTTPError(500, "Cannot save generated invites") from e
-        return {"ok": True}
+            raise HTTPError(500, 'Cannot save generated invites') from e
+        return {'ok': True}
+
+    @cherrypy.tools.json_out()
+    @cherrypy.tools.authorize()
+    def record_visit(self, id):
+        '''POST /api/events/:id/check-in'''
+        req = cherrypy.request
+        orm_session = req.orm_session
+        reg_id = int(id)
+        reg_data = api.get_event_registration_by_id(orm_session, reg_id)
+        if not reg_data:
+            raise HTTPError(400,
+                            'There is no registration record'
+                            'for id={id}'.format(id=reg_id))
+        reg_data.visited = True
+        orm_session.merge(reg_data)
+        orm_session.commit()
+        return to_collection(reg_data, sort_keys=True)
 
 
 class Places(APIBase):
@@ -522,109 +566,62 @@ class Places(APIBase):
 
 rest_api = cherrypy.dispatch.RoutesDispatcher()
 rest_api.mapper.explicit = False
-rest_api.connect("add_participant", "/participants", Participants,
-                 action="create", conditions={"method": ["POST"]})
-rest_api.connect("list_participants", "/participants", Participants,
-                 action="list_all", conditions={"method": ["GET"]})
-rest_api.connect("get_participant", "/participants/{id}", Participants,
-                 action="show", conditions={"method": ["GET"]})
-rest_api.connect("edit_participant", "/participants/{id}", Participants,
-                 action="update", conditions={"method": ["PUT"]})
+rest_api.connect('add_participant', '/participants', Participants,
+                 action='create', conditions={'method': ['POST']})
+rest_api.connect('list_participants', '/participants', Participants,
+                 action='list_all', conditions={'method': ['GET']})
+rest_api.connect('get_participant', '/participants/{id}', Participants,
+                 action='show', conditions={'method': ['GET']})
+rest_api.connect('edit_participant', '/participants/{id}', Participants,
+                 action='update', conditions={'method': ['PUT']})
 # rest_api.connect("remove_participant", "/participants/{id}", Participants,
 #                  action="delete", conditions={"method": ["DELETE"]})
 
-rest_api.connect("api_add_event", "/events", Events, action="create",
-                 conditions={"method": ["POST"]})
-rest_api.connect("api_list_events", "/events", Events, action="list_all",
-                 conditions={"method": ["GET"]})
-rest_api.connect("api_get_event", "/events/{id}", Events, action="show",
-                 conditions={"method": ["GET"]})
-rest_api.connect("api_edit_event", "/events/{id}", Events, action="update",
-                 conditions={"method": ["PUT"]})
+rest_api.connect('api_add_event', '/events', Events, action='create',
+                 conditions={'method': ['POST']})
+rest_api.connect('api_list_events', '/events', Events, action='list_all',
+                 conditions={'method': ['GET']})
+rest_api.connect('api_get_event', '/events/{id}', Events, action='show',
+                 conditions={'method': ['GET']})
+rest_api.connect('api_edit_event', '/events/{id}', Events, action='update',
+                 conditions={'method': ['PUT']})
 # rest_api.connect("remove_event", "/events/{id:\d+}", Events, action="delete",
 #                  conditions={"method": ["DELETE"]})
 # rest_api.connect("delete_event", "/events/{id:\d+}/delete", Events,
 #                  action="delete",
 #                  conditions={"method": ["POST"]})
-rest_api.connect("generate_invites", "/events/{id:\d+}/invites", Events,
-                 action="generate_invites",
-                 conditions={"method": ["POST"]})
-rest_api.connect("generate_report", "/events/{id:\d+}/report", Events,
-                 action="generate_report",
-                 conditions={"method": ["POST"]})
+rest_api.connect('generate_invites', '/events/{id:\d+}/invites', Events,
+                 action='generate_invites',
+                 conditions={'method': ['POST']})
+rest_api.connect('generate_report', '/events/{id:\d+}/report', Events,
+                 action='generate_report',
+                 conditions={'method': ['POST']})
 
-rest_api.connect("approve_event_participants",
-                 r"/events/{id:\d+}/approve", Events,
-                 action="approve_participants",
-                 conditions={"method": ["POST"]})
-rest_api.connect("send_confirm_event_participants",
-                 r"/events/{id:\d+}/send-confirm", Events,
-                 action="send_confirm_participants",
-                 conditions={"method": ["POST"]})
-rest_api.connect("resend_approve_event_participants",
-                 r"/events/{id:\d+}/resend", Events,
-                 action="resend_approve_participants",
-                 conditions={"method": ["POST"]})
-rest_api.connect("export_event_participants",
-                 r"/events/{id:\d+}/export_participants", Events,
-                 action="export_participants",
-                 conditions={"method": ["GET"]})
+rest_api.connect('approve_event_participants',
+                 r'/events/{id:\d+}/approve', Events,
+                 action='approve_participants',
+                 conditions={'method': ['POST']})
+rest_api.connect('send_confirm_event_participants',
+                 r'/events/{id:\d+}/send-confirm', Events,
+                 action='send_confirm_participants',
+                 conditions={'method': ['POST']})
+rest_api.connect('resend_approve_event_participants',
+                 r'/events/{id:\d+}/resend', Events,
+                 action='resend_approve_participants',
+                 conditions={'method': ['POST']})
+rest_api.connect('export_event_participants',
+                 r'/events/{id:\d+}/export_participants', Events,
+                 action='export_participants',
+                 conditions={'method': ['GET']})
 
-rest_api.connect("list_places", "/places", Places, action="list_all",
-                 conditions={"method": ["GET"]})
+rest_api.connect('list_places', '/places', Places, action='list_all',
+                 conditions={'method': ['GET']})
 
-rest_api.connect("api_info", "/info", Admin, action="info",
-                 conditions={"method": ["GET"]})
-rest_api.connect("sign-in", "/sign-in", Admin, action="sign_in",
-                 conditions={"method": ["POST"]})
-
-
-# Error handlers
-
-def generic_error_handler(status, message, traceback, version):
-    """error_page.default"""
-
-    response = cherrypy.response
-    response.headers['Content-Type'] = "application/json"
-    response.headers.pop('Content-Length', None)
-
-    code, reason, _ = cphttputil.valid_status(status)
-    result = {"code": code, "reason": reason, "message": message}
-    if hasattr(cherrypy.request, "params"):
-        params = cherrypy.request.params
-        if "debug" in params and params["debug"]:
-            result["traceback"] = traceback
-    return json.dumps(result)
-
-
-def unexpected_error_handler():
-    """request.error_response"""
-
-    (typ, value, tb) = sys.exc_info()
-    if typ:
-        debug = False
-        if hasattr(cherrypy.request, "params"):
-            params = cherrypy.request.params
-            debug = "debug" in params and params["debug"]
-
-        response = cherrypy.response
-        response.headers['Content-Type'] = "application/json"
-        response.headers.pop('Content-Length', None)
-        content = {}
-
-        if isinstance(typ, HTTPError):
-            cherrypy._cperror.clean_headers(value.code)
-            response.status = value.status
-            content = {"code": value.code, "reason": value.reason,
-                       "message": value._message}
-        elif isinstance(typ, (TypeError, ValueError, KeyError)):
-            cherrypy._cperror.clean_headers(400)
-            response.status = 400
-            reason, default_message = cphttputil.response_codes[400]
-            content = {"code": 400, "reason": reason,
-                       "message": value.message or default_message}
-
-        if cherrypy.serving.request.show_tracebacks or debug:
-            tb = traceback.format_exc()
-            content["traceback"] = tb
-        response.body = json.dumps(content)
+rest_api.connect('api_info', '/info', Admin, action='info',
+                 conditions={'method': ['GET']})
+rest_api.connect('sign-in', '/sign-in', Admin, action='sign_in',
+                 conditions={'method': ['POST']})
+rest_api.connect('check-in',
+                 r'/events/{id:\d+}/check-in', Events,
+                 action='record_visit',
+                 conditions={'method': ['POST']})
