@@ -56,3 +56,6 @@ __pycache__
 
 # vagrant files
 .vagrant/
+
+# environ configuration
+/environ
