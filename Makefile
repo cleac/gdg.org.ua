@@ -142,4 +142,4 @@ stop-prod:
 
 .PHONY: environ
 environ:
-	bash -c scripts/mk-environ-file.sh
+	scripts/mk-environ-file.sh
