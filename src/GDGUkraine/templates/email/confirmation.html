@@ -1,27 +1,27 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>GDG Events | {{ event.title }}: Confirmation</title>
-    <link rel="stylesheet" type="text/css" href="style.css" />
-    <base href="https://gdg.org.ua" />
-</head>
-<body>
-    <div class="container">
-        <div class="content">
-            <h1>Confirmation of your visit to {{ event.title }}</h1>
-
-            <div class="main-text">
-                <div>Please confirm that you will actually visit {{ event.title }}</div>
-
-                <div>{{ event.desc }}</div>
-
-                <div>If you are really going to visit this event please follow this link: <a href="{{ confirm.url | e }}">{{ confirm.url }}</a>.
-                    You can ignore this email if you're not going to attend.
-                </div>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <title>Confirmation for event {{ event.title }}</title>
+        <base href="https://gdg.org.ua"/>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    </head>
+    <body style="marin: 8px; padding: 0px; max-width: 768px">
+        <center><img style="width: 200px" width="200px" src="/img/gdg_ukraine_logo.png"></center>
+        <p style="margin-left: 20px; margin-bottom: 20px; font-family: Lato, Arial, sans-serif">Hey, pal!</p>
+        <p style="margin-left: 20px; font-family: Lato, Arial, sans-serif">
+        We are writing to you, because you have registered to "{{ event.title }}". We just want to clarify, whether you are going to attend the event, or you have another plans. You can get more info about an event right <a href="{{}}">here</a>.
+        </p>
+        <p style="margin: 0px 20px; font-family: Lato, Arial, sans-serif">If you are going to attend, press the button below.</p>
+        <p style="margin: 0px 20px; font-family: Lato, Arial, sans-serif">If no, just ignore this email.</p>
+        <a href="{{ confirm.url | e }}">
+            <div style="margin: 10px auto; background-color: blue; width: 160px; height: 35px; color: white; text-align: center; vertical-align: baseline; border-radius: 3px; border-color: blue" width="160px" height="35px" bgcolor="blue">
+                <div style="padding: 6px; font-family: Lato, Arial, sans-serif">I am going to attend</div>
             </div>
-
-            <a href="/" target="_blank"><img class="gdg-image" src="/img/gdg_org_ua.png" alt="gdg.org.ua"></a>
-        </div>
-    </div>
-</body>
+        </a>
+        <p style="margin-left: 20px; font-family: Lato, Arial, sans-serif">
+        Sincerely yours,<br>
+        friends from GDG Ukraine
+        </p>
+    </body>
 </html>
