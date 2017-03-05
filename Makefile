@@ -19,6 +19,7 @@ TOX=$(PENV_BIN_PATH)tox
 USER_SHELL=/bin/zsh
 ACTIVATE_ENV=if test -d ./$(PENV); then . ./$(PENV)/bin/activate; fi; if test -f ./.exports; then . ./.exports; fi
 USE_NVM=if test -d ~/.nvm; then . ~/.nvm/nvm.sh; nvm use 5.0.0 ; fi
+EMAIL_DIRECTORY=src/GDGUkraine/templates/email
 
 PID_PATH=/var/tmp/run
 STAGING_PORT=11010
@@ -144,3 +145,6 @@ stop-prod:
 .PHONY: environ-regen
 environ-regen:
 	bin/mk-environ-file.sh
+
+mjml:
+	@bin/build_mjml.sh ${EMAIL_DIRECTORY}

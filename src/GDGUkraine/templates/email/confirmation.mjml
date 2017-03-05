@@ -1,0 +1,41 @@
+<mjml>
+  <mj-head>
+    <mj-title>Confirmation for event {{ event.title }}</mj-title>
+    <mj-attributes>
+      <mj-all font-family="Lato, Arial, sans-serif" font-size="16px" />
+      <mj-text color="#212121" pading="0"/>
+    </mj-attributes>
+  </mj-head>
+  <mj-body>
+    <mj-container>
+      <mj-section>
+        <mj-column>
+
+          <mj-include path="./_gdg_logo.mjml"/>
+
+          <mj-text>
+            Hi, pal!
+          </mj-text>
+          <mj-text>
+            Thanks for registering to the event "{{ event.title }}".<br>
+            Please confirm your attendance by clicking the button below.
+          </mj-text>
+
+          <mj-button background-color="#1976d2" color="white" href="{{ confirm.url | e }}">
+            I will attend
+          </mj-button>
+
+          <mj-text>
+            If you have decided not to come, just ignore this letter.
+          </mj-text>
+
+          <mj-text>
+            Sincerely yours,<br>
+            friends from GDG Ukraine
+          </mj-text>
+
+        </mj-column>
+      </mj-section>
+    </mj-container>
+  </mj-body>
+</mjml>
