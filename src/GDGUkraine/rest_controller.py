@@ -378,7 +378,6 @@ class Events(APIBase):
                 secure_id = aes_encrypt(str(user_reg.id))
 
                 confirm_data = {
-                    'url': url_for_class(
                         handler='controller.Root.confirm',
                         url_args=[secure_id],
                     ),
