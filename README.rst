@@ -139,8 +139,20 @@ If you for some reason need to run shell with env activated, run this:
     $ make activate-env
     [gdg.org.ua][py3.5] $ _
 
+Building emails
+---------------
+All the emails are written on template engine [MJML](mjml.io). To build all of the emails, use
+
+.. code:: shell
+   :number-lines:
+
+    $ make mjml
+
+Note: the mjml must be installed in the system.
+
 Troubleshooting
 ---------------
+=======
 
 Errors with installing mysql-connector-python
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

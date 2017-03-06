@@ -13,6 +13,7 @@ OPEN_URL=xdg-open
 MIGRATOR=$(PENV_BIN_PATH)alembic -c config/alembic.ini
 BWR=bower
 NPM=npm
+MJML=mjml
 PRECOMMIT=$(PENV_BIN_PATH)pre-commit
 BLUEBERRY=$(PENV_BIN_PATH)blueberrypy serve -b
 TOX=$(PENV_BIN_PATH)tox
@@ -54,7 +55,7 @@ test-env:
 
 front-deps:
 	@$(USE_NVM); \
-	$(NPM) install -g $(BWR) && \
+	$(NPM) install -g $(BWR) $(MJML) && \
 	$(BWR) install
 
 env:
@@ -142,9 +143,10 @@ stop-prod:
 
 .env: environ-regen
 
-.PHONY: environ-regen
+.PHONY: environ-regen mjml
 environ-regen:
 	bin/mk-environ-file.sh
 
-mjml:
-	@bin/build_mjml.sh ${EMAIL_DIRECTORY}
+mjml: front-deps
+	@$(USE_NVM); \
+	bin/build_mjml.sh ${EMAIL_DIRECTORY}

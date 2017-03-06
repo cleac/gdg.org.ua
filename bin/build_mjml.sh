@@ -18,11 +18,11 @@ END
 MJML_REGEX="^[^_].+\.mjml$"
 
 if [ "$1" = 'help' -o "$1" = 'h' -o "$1" = '--help' ]; then
-  echo "$USAGE"
+  echo -n "$USAGE\n"
 fi
 
 if ! command_exists mjml; then
-  echo 'mjml is not installed. Please run `npm i -g mjml` to proceed'
+  echo -n 'mjml is not installed. Please run `npm i -g mjml` to proceed\n'
   exit 1
 fi
 
@@ -40,13 +40,13 @@ for arg in $@; do
 done
 
 if [ -z $dirs ]; then 
-  echo 'Please, specify directory, where the files to build are!'
+  echo -n 'Please, specify directory, where the files to build are!\n'
   exit 2
 fi
 
 for dirname in $dirs; do
   if [ -d $dirname ]; then
-    printf "Building for directory $dirname "
+    echo -n "Building for directory $dirname "
     for file in $(ls $dirname | grep -E $MJML_REGEX )
     do
       filename_mjml=$(basename "$file")
@@ -54,16 +54,16 @@ for dirname in $dirs; do
       from_file="$dirname/$filename_mjml"
       to_file="$dirname/$filename.html"
       mjml -r $from_file -o $to_file ${minify}
-      if [ "$?" = "0" ]; then
-        printf '.'
+      if [ $? -eq 0 ]; then
+        echo -n '.'
       else
-        echo 'ERROR\nAn error occured, please check it out'
+        echo -n 'ERROR\nAn error occured, please check it out\n'
         exit 3
       fi
     done
-    printf ' Done\n'
+    echo -n ' Done\n'
   else 
-    echo "Directory '$dirname' was not found: skipping"
+    echo -n "\nDirectory '$dirname' was not found: skipping\n"
   fi
 done
 

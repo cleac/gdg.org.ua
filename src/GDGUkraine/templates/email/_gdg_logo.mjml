@@ -1,6 +1,2 @@
-<mj-section>
-  <mj-column>
-      <mj-image width="200" src="/img/gdg_ukraine_logo.png"></mj-image>
-      <mj-divider border-color="#BDBDBD" border-width="1px"></mj-divider>
-  </mj-column>
-</mj-section>
+<mj-image width="200" src="{{ url_for_static('/img/gdg_ukraine_logo.png') }}"></mj-image>
+<mj-divider border-color="#BDBDBD" border-width="1px"></mj-divider>
