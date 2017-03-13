@@ -18,11 +18,11 @@ END
 MJML_REGEX="^[^_].+\.mjml$"
 
 if [ "$1" = 'help' -o "$1" = 'h' -o "$1" = '--help' ]; then
-  echo -n "$USAGE\n"
+  echo "$USAGE\n"
 fi
 
 if ! command_exists mjml; then
-  echo -n 'mjml is not installed. Please run `npm i -g mjml` to proceed\n'
+  echo 'mjml is not installed. Please run `npm i -g mjml` to proceed\n'
   exit 1
 fi
 

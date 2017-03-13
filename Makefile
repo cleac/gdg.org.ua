@@ -143,10 +143,11 @@ stop-prod:
 
 .env: environ-regen
 
-.PHONY: environ-regen mjml
+.PHONY: environ-regen
 environ-regen:
 	bin/mk-environ-file.sh
 
+.PHONY: mjml
 mjml: front-deps
 	@$(USE_NVM); \
 	bin/build_mjml.sh ${EMAIL_DIRECTORY}
