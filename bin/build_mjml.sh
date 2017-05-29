@@ -22,32 +22,32 @@ if [ "$1" = 'help' -o "$1" = 'h' -o "$1" = '--help' ]; then
 fi
 
 if ! command_exists mjml; then
-  echo 'mjml is not installed. Please run `npm i -g mjml` to proceed\n'
+  (>&2 echo 'mjml is not installed. Please run `npm i -g mjml` to proceed')
   exit 1
 fi
 
-for arg in $@; do
+for arg in "$@"; do
   if [ "$arg" = '-m' -o "$arg" = '--minify' ]; then
     minify='-m'
   else
-    if [ -z $dirs ]
+    if [ -z "$dirs" ]
     then
-      dirs=$arg
+      dirs="$arg"
     else
       dirs="$dirs $arg"
     fi
   fi
 done
 
-if [ -z $dirs ]; then 
-  echo -n 'Please, specify directory, where the files to build are!\n'
+if [ -z "$dirs" ]; then
+  (>&2 echo 'Please, specify directory, where the files to build are!')
   exit 2
 fi
 
-for dirname in $dirs; do
-  if [ -d $dirname ]; then
+for dirname in "$dirs"; do
+  if [ -d "$dirname" ]; then
     echo -n "Building for directory $dirname "
-    for file in $(ls $dirname | grep -E $MJML_REGEX )
+    for file in $(ls "$dirname" | grep -E $MJML_REGEX )
     do
       filename_mjml=$(basename "$file")
       filename="${filename_mjml%.*}"
@@ -57,13 +57,13 @@ for dirname in $dirs; do
       if [ $? -eq 0 ]; then
         echo -n '.'
       else
-        echo -n 'ERROR\nAn error occured, please check it out\n'
+        (>&2 echo 'ERROR\nAn error occured, please check it out')
         exit 3
       fi
     done
-    echo -n ' Done\n'
-  else 
-    echo -n "\nDirectory '$dirname' was not found: skipping\n"
+    echo " Done"
+  else
+    echo "\nDirectory '$dirname' was not found: skipping"
   fi
 done
 
